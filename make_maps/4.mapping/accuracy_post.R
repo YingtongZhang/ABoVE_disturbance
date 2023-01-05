@@ -16,7 +16,7 @@
 rm(list=ls())
 library(ggplot2)
 
-<<<<<<< HEAD
+
 #mPath <- '/Users/zhangyt/Google Drive/PhD/Projects/ABoVE/Accuracy/AA_final_map/'
 mPath <- '/Users/Yingtong/Google Drive/PhD/Projects/ABoVE/Accuracy/AA_final_map/'
 sfile <- paste(mPath,'post_strat/sort_table_to_3c/STRATA_MAP_INTP_3C.csv',sep='')
@@ -28,17 +28,7 @@ oPath <- paste(mPath,'post_strat/sort_table_to_3c/',sep='')
 # sfile <- paste(mPath,'post_strat/split_fire/STRATA_MAP_INTP_4C.csv',sep='')
 # strfile <- paste(mPath, 'post_strat/split_fire/stratum.csv',sep='')
 # oPath <- paste(mPath,'post_strat/split_fire/',sep='')
-=======
-mPath <- '/Users/zhangyt/Google Drive/PhD/Projects/ABoVE/Accuracy/AA_final_map/'
-# mPath <- '/Users/Yingtong/Google Drive/PhD/Projects/ABoVE/Accuracy/AA_final_map/'
-# sfile <- paste(mPath,'post_strat/sort_table_to_3c/STRATA_MAP_INTP_3C.csv',sep='')
-# strfile <- paste(mPath, 'post_strat/sort_table_to_3c/stratum.csv',sep='')
-# oPath <- paste(mPath,'post_strat/sort_table_to_3c/',sep='')
-sfile <- paste(mPath,'post_strat/dist_nodist/STRATA_MAP_INTP_1C.csv',sep='')
-strfile <- paste(mPath, 'post_strat/dist_nodist/stratum.csv',sep='')
-oPath <- paste(mPath,'post_strat/dist_nodist/',sep='')
 
->>>>>>> 8c0cdddc3fe85b972884e7f7e2dddaeb5758bbaf
 
 ## remember to swith between 2, 4, and 6
 # 2: Disturbance or NoDisturbance
