@@ -1,0 +1,184 @@
+## created to combine all rows - after trends and pheno
+## and create some jpgs from their output
+#cur_lib = "~/R/x86_64-pc-linux-gnu-library/3.2.2"
+#library(sp,lib.loc=cur_lib)
+require(raster)
+library(RColorBrewer)
+library(doParallel)
+library(foreach)
+#library(data.table)
+
+make_jpg <- function(in_dat,xy,cur_name,out_file) {
+  mycolors = colorRampPalette(c("red","orange","yellow","green","darkgreen","blue"))
+
+    ras = rasterFromXYZ(cbind(xy,in_dat))
+    cur_range = round(quantile(in_dat,c(0.05,0.95),na.rm=T),2)
+    cur_int = (cur_range[2]-cur_range[1])/5
+    
+      jpeg(file=out_file,width=5,height=5,units="in",res=250)
+      par(mar=rep(0.2, 4), oma=rep(0.1, 4))
+      image(ras,col=mycolors(150))
+    
+    ## add a label with the year and date
+    text(x=3000,y=500, labels=cur_name, col=1, cex=4)
+    plot(ras, legend.only=TRUE, col=mycolors(150),
+         legend.width = 2,
+         axis.args=list(at=seq(cur_range[1], cur_range[2],cur_int),
+                        labels=seq(cur_range[1],cur_range[2], cur_int), 
+                        cex.axis=0.6),
+         legend.args=list(text="          ", side=4, font=2, line=2.5, cex=0.8))
+         #legend.args=list(text='NDVI', side=4, font=2, line=2.5, cex=0.8))
+    dev.off()
+
+}  ## end function
+
+######################
+#### BEGIN MAIN
+###############
+
+
+debug=1
+if(debug==0) {
+  args = commandArgs(trailingOnly=T)
+  in_tile = args[1]
+  in_dir = args[2]
+  out_dir = args[3]
+
+} else {
+  in_tile = "Bh11v11"
+  in_dir = paste("../",
+                 in_tile,"_phen2",sep="")
+ 
+  out_dir=paste("./jpgs_",in_tile,sep="")
+}
+
+if(!file.exists(out_dir)) {
+  dir.create(out_dir)
+}
+
+in_files <- list.files(path=in_dir,pattern=glob2rx("*.RData"),full.names=T,include.dirs=T)
+
+num_files = length(in_files)
+## setup to loop through files
+nrows=6000
+ncols=6000
+nrows_per_chunk = 2
+tot_pix_chunk = nrows_per_chunk*ncols
+
+npix= nrows*ncols
+xy = array(NA,dim=c(npix,2))
+colnames(xy) = c("x","y")
+for(i in 1:nrows) {
+    start = (i-1)*ncols + 1
+    end = i*ncols
+    
+    xy[start:end,"x"] = seq(1,ncols)
+    xy[start:end,"y"] = nrows - i + 1
+}
+
+#all_years_tm5 = seq(1984,2011)
+#all_years_etm = seq(1999,2014)
+
+num_pheno = 68
+## each chunk has 6000*3 pixels
+
+
+
+skip_flag = 0
+
+
+if(skip_flag==0) {
+  
+  #all_years_tm5_1 = seq(1984,2015,4)
+  # all_years_etm = seq(1999,2015,4)
+  #num_years_tm5 = length(all_years_tm5)
+  #num_years_etm = length(all_years_etm)
+  #cur_cols = num_years_etm+num_years_tm5 + num_pheno
+
+#time_process <- system.time  (
+#all_pheno_out = array(NA,dim=c(npix,num_pheno))
+#tm5_out1 = array(NA,dim=c(npix,num_years_tm5))
+#tm5_qa1 = array(NA,dim=c(npix,num_years_tm5))
+#etm_out = array(NA,dim=c(npix,num_years_etm))
+start_year=1984
+end_year=2015
+num_comps = 5
+all_out = vector("list",num_comps)
+all_count = vector("list",num_comps)
+all_years_tm5 = vector("list",num_comps)
+num_years_tm5 = array(NA,num_comps)
+
+for(i in 1:num_comps) {
+  all_years_tm5[[i]] = seq(start_year,end_year,i)
+  num_years_tm5[i] = length(all_years_tm5[[i]])
+}
+for(i in 1:num_comps) {
+  all_out[[i]] = array(NA,dim=c(npix,num_years_tm5[i]))
+  all_count[[i]] = array(NA,dim=c(npix,num_years_tm5[i]))
+}
+
+
+for(i in seq(1,(nrows/nrows_per_chunk))) {
+#for(i in 1:100) {
+  in_file = paste(in_dir,"/",in_tile,"_",i,".RData",sep="")
+    if(file.exists(in_file)) {
+      load(in_file)
+    } else {
+      print(paste("File ",in_file,"doesnt exist!"))
+      next
+    }
+    start = ((i-1)*tot_pix_chunk)+1
+    end = i*tot_pix_chunk
+    for(y in 1:5) {
+      start_count = num_years_tm5[y]+1
+      end_count=num_years_tm5[y]*2
+      all_out[[y]][start:end,] = green_out[[y]][,1:(num_years_tm5[y])]
+      all_count[[y]][start:end,] = green_out[[y]][,start_count:end_count]
+      
+  	  #all_pheno_out[start:end,]= pheno_out
+  	  #tm5_out[start:end,] = green_out[["tm5"]][,1:(num_years_tm5)]
+  	  #etm_out[start:end,] = green_out[["etm"]][,1:(num_years_etm)]
+      #tm5_qa[start:end,] = green_out[["tm5"]][,(num_years_tm5+1):(num_years_tm5*2)]
+    }
+}
+#)  ## end system.time
+
+
+#print(time_process)
+
+#pheno_names = c("Nobs","Rsmooth","maxEVI","minEVI","mSpr","mAut",
+#                paste(seq(1984,2014),"-spr",sep=""),paste(seq(1984,2014),"-aut",sep=""))
+#colnames(all_pheno_out) = pheno_names
+#colnames(tm5_out) = all_years_tm5
+#colnames(etm_out) = all_years_etm
+
+#for(i in 1:num_pheno) {
+#  cur_name = pheno_names[i]
+  
+#  out_file = paste(out_dir,"/pheno_",formatC(i, width=3, flag="0"),".jpg",sep="")
+  
+ # make_jpg(all_pheno_out[,i],xy,cur_name,out_file)
+#}
+
+for(y in 1:5) {
+for(i in 1:num_years_tm5[y]) {
+  out_file = paste(out_dir,"/tm5_",y,"_",formatC(i, width=3, flag="0"),".jpg",sep="")
+  cur_name = all_years_tm5[[y]][i]
+make_jpg(all_out[[y]][,i],xy,cur_name,out_file)
+}
+
+for(i in 1:num_years_tm5[y]) {
+  out_file = paste(out_dir,"/tm5_count_",y,"_",formatC(i, width=3, flag="0"),".jpg",sep="")
+  cur_name = all_years_tm5[[y]][i]
+    make_jpg(all_count[[y]][,i],xy,cur_name,out_file)
+}
+} ## end y
+#for(i in 1:num_years_etm) {
+#  out_file = paste(out_dir,"/etm_",formatC(i, width=3, flag="0"),".jpg",sep="")
+#  cur_name = all_years_etm[i]
+#  make_jpg(etm_out[,i],xy,cur_name,out_file)
+#}
+
+}  # skip flag
+
+print("Done with all output!")

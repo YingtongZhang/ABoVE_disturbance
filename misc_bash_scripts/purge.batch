@@ -1,0 +1,10 @@
+#!/bin/bash
+
+## specify part of a job name and it will delete all jobs with that name
+name=$1
+for i in `qstat -u dsm | awk '{print $1, $3}' | grep $name | awk '{print $1}'`
+do
+
+qdel $i
+
+done

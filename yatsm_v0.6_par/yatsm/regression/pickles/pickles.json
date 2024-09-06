@@ -1,0 +1,8 @@
+{
+    "OLS": "LinearRegression",
+    "glmnet_Lasso20": "Lasso",
+    "sklearn_Lasso20": "Lasso",
+    "rlm_maxiter10": "RLM",
+    "sklearn_LassoCV_n50": "LassoCV",
+    "glmnet_LassoCV_n50": "LassoCV"
+}

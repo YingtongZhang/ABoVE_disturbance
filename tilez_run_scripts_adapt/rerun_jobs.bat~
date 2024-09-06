@@ -1,0 +1,145 @@
+#!/bin/bash
+
+if [ -z "$1" ] ; then
+   echo Usage \./dist_nodes.bat last_run total_num_nodes cur_sens
+   exit 1
+else
+   last_run="$1" 
+fi
+
+if [ -z "$2" ] ; then
+   echo No argument 2 provided!
+   exit 1
+else
+   total_num_nodes="$2"
+fi
+
+if [ -z "$3" ] ; then
+   echo No argument 3 provided!
+   exit 1
+else
+   cur_sens="$3"
+fi
+
+if [ -z "$4" ] ; then
+   echo No argument 4 provided!
+   exit 1
+else
+   in_count="$4"
+fi
+
+
+code_dir="$NOBACKUP/tilez_all_above"
+global_tiles="$NOBACKUP/setup_global_runs/global_scene.txt"
+num_scenes=$(more $global_tiles | wc -l)
+echo Processing total of $num_scenes scenes.  Currently running with $total_num_nodes nodes. Last run finished at $last_run.  Currently running sensor $cur_sens.
+
+
+
+let first=($last_run+1)
+let last=($last_run+$total_num_nodes)
+
+echo Processing scenes $first $last out of $num_scenes
+
+count=1
+cur_last=1
+for p in `cat $global_tiles`; do
+    if [ "$count" -ge $first ] && [ "$count" -le $last ] ; then
+	echo $p $count
+	cur_last=$(( $count+1 ))
+	cur_num=$(printf "%03d" $in_count)
+	echo nohup pupsh "hostname ~ 'adaptlight${cur_num}'" "bash $code_dir/run_tiles.sh $p $cur_sens &> $code_dir/logs/run_tiles_%h_${count}_${cur_sens}.log"
+	nohup pupsh "hostname ~ 'adaptlight${cur_num}'" "bash $code_dir/run_tiles.sh $p $cur_sens &> $code_dir/logs/run_tiles_%h_${count}_${cur_sens}.log" &
+work_dir="/att/nobackup/dsullame/tilez_all_above"
+cur_yaml="$work_dir/above_ingest.yaml"
+in_dir="/att/nobackup/dsullame/test_mirror"
+## a much easier way to search through dirs
+all_landsat_dir="/att/pubrepo/LANDSAT/EDC-ESPA/${in_sens}/${in_name}"
+
+echo "Processing $in_sens $in_name files in $in_dir"
+
+temp_name="${in_sens}${in_name}"
+echo $temp_name
+n=$(find $all_landsat_dir -maxdepth 2 -name ${temp_name}\*.xml | wc -l)
+i=1
+echo "Found $n images to process"
+
+tot_bands=0
+
+export LC_ALL=en_US.utf-8
+export LANG=en_US.utf-8
+## this activates the virtual environment i need to run
+source $HOME/miniconda3/bin/activate tilezilla
+
+## when we start this environ we lost gdal_data
+GDAL_DATA="/opt/gdal-static/share/gdal"
+	
+## export this directory as root
+export root=$(readlink -f $(pwd))
+
+for xml_file in $(find $all_landsat_dir -maxdepth 2 -name ${temp_name}\*.xml); do
+
+    # Use AWK to remove .xml
+    id=$(basename $xml_file | awk -F '.' '{ print $1 }')
+    echo "<----- $i / $n: $id"
+    
+    ## to get other files
+    cur_in_dir=${in_dir}/${id}
+
+    tot_bands=`sqlite3 tilezilla.db "select count(b.path) from product p, band b where b.product_id=p.id and p.timeseries_id='$id';"`
+    let "mod_bands = $tot_bands % 8"
+    echo "$mod_bands $tot_bands"
+    if [ $mod_bands -eq 0 ] && [ $tot_bands -gt 0 ]; then
+        echo "$id has been processsed"
+        temp=3
+     else
+                echo "$id has $mod_bands bands processed"
+                echo "tilez -C $cur_yaml ingest $cur_in_dir"
+                tilez -C $cur_yaml ingest $cur_in_dir*
+                echo "Finished tiling ${id}"
+     fi
+    
+    # Iterate count
+    let i+=1
+done
+
+source deactivate
+echo "Done with all files"
+## export this directory as root
+export root=$(readlink -f $(pwd))
+
+for xml_file in $(find $all_landsat_dir -maxdepth 2 -name ${temp_name}\*.xml); do
+
+    # Use AWK to remove .xml
+    id=$(basename $xml_file | awk -F '.' '{ print $1 }')
+    echo "<----- $i / $n: $id"
+    
+    ## to get other files
+    cur_in_dir=${in_dir}/${id}
+
+    tot_bands=`sqlite3 tilezilla.db "select count(b.path) from product p, band b where b.product_id=p.id and p.timeseries_id='$id';"`
+    let "mod_bands = $tot_bands % 8"
+    echo "$mod_bands $tot_bands"
+    if [ $mod_bands -eq 0 ] && [ $tot_bands -gt 0 ]; then
+        echo "$id has been processsed"
+        temp=3
+     else
+                echo "$id has $mod_bands bands processed"
+                echo "tilez -C $cur_yaml ingest $cur_in_dir"
+                tilez -C $cur_yaml ingest $cur_in_dir*
+                echo "Finished tiling ${id}"
+     fi
+    
+    # Iterate count
+    let i+=1
+done
+
+source deactivate
+echo "Done with all files"
+
+
+(( in_count++ ))
+    fi
+    (( count++ ))
+done
+echo "The next one will start at $cur_last"

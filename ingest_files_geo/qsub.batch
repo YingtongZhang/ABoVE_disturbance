@@ -1,0 +1,8 @@
+#!/bin/bash -l
+
+in_tile=$1
+in_file=${in_tile}_in.txt
+for pr in `cat $in_file`; do
+qsub run_tiles.sh $pr LT5 $in_tile
+qsub run_tiles.sh $pr LE7 $in_tile
+done

@@ -1,0 +1,13 @@
+WARNING: ignoring environment value of R_HOME
+Loading required package: methods
+Loading required package: sp
+rgdal: version: 0.8-16, (SVN revision 498)
+Geospatial Data Abstraction Library extensions to R successfully loaded
+Loaded GDAL runtime: GDAL 1.10.0, released 2013/04/24
+Path to GDAL shared files: /project/earth/packages/gdal-1.10.0/share/gdal
+Loaded PROJ.4 runtime: Rel. 4.8.0, 6 March 2012, [PJ_VERSION: 480]
+Path to PROJ.4 shared files: /project/earth/packages/proj-4.8.0/share/proj
+OGR data source with driver: ESRI Shapefile 
+Source: "../make_sample_110517/val_out_110517/val_Bh04v06.shp", layer: "val_Bh04v06"
+with 75 features and 6 fields
+Feature type: wkbPoint with 2 dimensions

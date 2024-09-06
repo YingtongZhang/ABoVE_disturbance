@@ -1,0 +1,236 @@
+## created to combine all rows - after trends and pheno
+## and create some jpgs from their output
+#cur_lib = "~/R/x86_64-pc-linux-gnu-library/3.2.2"
+#library(sp,lib.loc=cur_lib)
+require(raster)
+library(RColorBrewer)
+library(doParallel)
+library(foreach)
+#library(data.table)
+
+make_ras <- function(cur_dat,tile) {
+  ulx=-3400020
+  uly=4640000
+  pix=30
+  dim=6000
+  
+  cur_tile_x = as.numeric(substr(tile,3,4))
+  cur_tile_y = as.numeric(substr(tile,6,7))
+  
+  ulx_map= ulx + (cur_tile_x * pix * dim)
+  uly_map= uly - (cur_tile_y * pix * dim)
+  
+  lrx_map= ulx + ((cur_tile_x+1) * pix * dim)
+  lry_map= uly - ((cur_tile_y+1) * pix * dim)
+  
+  xy = matrix(cur_dat,nrow=dim,ncol=dim,byrow=T)
+  # Turn the matrix into a raster
+  rast <- raster(xy)
+  # Give it x/y coords
+  extent(rast) <- c(ulx_map,lrx_map,lry_map,uly_map)
+  # ... and assign a projection
+  projection(rast) <- CRS("+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs")
+
+  return(rast)
+}
+
+
+make_jpg <- function(in_dat,xy,cur_name,out_file) {
+  mycolors = colorRampPalette(c("red","orange","yellow","green","darkgreen","blue"))
+
+    ras = rasterFromXYZ(cbind(xy,in_dat))
+    cur_range = round(quantile(in_dat,c(0.05,0.95),na.rm=T),2)
+    cur_int = (cur_range[2]-cur_range[1])/5
+    
+      jpeg(file=out_file,width=5,height=5,units="in",res=250)
+      par(mar=rep(0.2, 4), oma=rep(0.1, 4))
+      image(ras,col=mycolors(150))
+    
+    ## add a label with the year and date
+    text(x=3000,y=500, labels=cur_name, col=1, cex=4)
+    plot(ras, legend.only=TRUE, col=mycolors(150),
+         legend.width = 2,
+         axis.args=list(at=seq(cur_range[1], cur_range[2],cur_int),
+                        labels=seq(cur_range[1],cur_range[2], cur_int), 
+                        cex.axis=0.6),
+         legend.args=list(text="          ", side=4, font=2, line=2.5, cex=0.8))
+         #legend.args=list(text='NDVI', side=4, font=2, line=2.5, cex=0.8))
+    dev.off()
+
+}  ## end function
+
+######################
+#### BEGIN MAIN
+###############
+
+
+debug=0
+if(debug==0) {
+  args = commandArgs(trailingOnly=T)
+  in_tile = args[1]
+  in_dir = args[2]
+  out_dir = args[3]
+
+} else {
+  in_tile = "Bh11v11"
+  in_dir = paste("../",
+                 in_tile,"_green_110217",sep="")
+ 
+  out_dir=paste("./tifs_",in_tile,sep="")
+}
+
+in_files <- list.files(path=in_dir,pattern=glob2rx("*.RData"),full.names=T,include.dirs=T)
+
+num_files = length(in_files)
+## setup to loop through files
+nrows=6000
+ncols=6000
+nrows_per_chunk = 2
+tot_pix_chunk = nrows_per_chunk*ncols
+
+npix= nrows*ncols
+#xy = array(NA,dim=c(npix,2))
+#colnames(xy) = c("x","y")
+#for(i in 1:nrows) {
+#    start = (i-1)*ncols + 1
+#    end = i*ncols
+    
+#    xy[start:end,"x"] = seq(1,ncols)
+#    xy[start:end,"y"] = nrows - i + 1
+#}
+
+#all_years_tm5 = seq(1984,2011)
+#all_years_etm = seq(1999,2014)
+
+num_pheno = 68
+## each chunk has 6000*3 pixels
+
+## if you want to abort the script
+skip_flag = 0
+if(skip_flag>1) {
+  quit(save="no")
+}
+  
+
+### load values from arrays
+  all_years_tm5 = seq(1984,2011,1)
+  all_years_etm = seq(1999,2014,1)
+  num_years_tm5 = length(all_years_tm5)
+  num_years_etm = length(all_years_etm)
+  all_pheno_out = vector("list",num_pheno)
+  #tm5_out = array(NA,dim=c(npix,num_years_tm5))
+  #tm5_qa = array(NA,dim=c(npix,num_years_tm5))
+  #etm_out = array(NA,dim=c(npix,num_years_etm))
+  #etm_qa = array(NA,dim=c(npix,num_years_etm))
+
+  band_names = c("red","nir","swir1","swir2","num","date")
+  num_bands = length(band_names)
+
+## could make this a loop - or more likely a function u can call
+  for(year in 1999:2010)
+  {
+      start_y_etm = which(all_years_etm==year)
+      start_y_tm5 = which(all_years_tm5==year)
+
+      tm5_out = array(NA,dim=c(npix,num_bands))
+      etm_out = array(NA,dim=c(npix,num_bands))
+      time_process <- system.time  (
+
+        for(i in seq(1,(nrows/nrows_per_chunk))) {
+        #for(i in 1:100) {
+          in_file = paste(in_dir,"/",in_tile,"_",i,".RData",sep="")
+            if(file.exists(in_file)) {
+              load(in_file)
+            } else {
+              print(paste("File ",in_file,"doesnt exist!"))
+              next
+            }
+            start = ((i-1)*tot_pix_chunk)+1
+            end = i*tot_pix_chunk
+            
+           # for(b in 1:num_bands) {
+              start_etm = (start_y_etm-1)*num_bands + 1
+              end_etm = start_y_etm*num_bands
+              start_tm5 = (start_y_tm5-1)*num_bands + 1
+              end_tm5 = start_y_tm5*num_bands
+              etm_out[start:end,] = green_out[["etm"]][,start_etm:end_etm]
+              tm5_out[start:end,] = green_out[["tm5"]][,start_tm5:end_tm5]
+           # }
+              
+            #all_phen_out[]
+
+        }
+        )  ## end system.time
+      
+        print(time_process)
+      
+      
+      #cur_dat[cur_dat==fill]=NA
+      ## make it a raster layer
+      fill = -1
+      na_ind = is.na(etm_out)
+      etm_out[na_ind] = fill
+      etm_ras = make_ras(etm_out[,1],in_tile)
+      for(b in 2:num_bands) {
+        etm_ras = stack(etm_ras,make_ras(etm_out[,b],in_tile))
+      }
+              
+      out_etm_name = paste(out_dir,"/etm.",year,".tif",sep="")
+      writeRaster(etm_ras,out_etm_name,format="GTiff",datatype='FLT4S',NAFlag=fill, overwrite=T)
+      rm(etm_ras)
+      rm(etm_out)
+
+      na_ind = is.na(tm5_out)
+      tm5_out[na_ind] = fill
+      tm5_ras = make_ras(tm5_out[,1],in_tile)
+      for(b in 2:num_bands) {
+        tm5_ras = stack(tm5_ras,make_ras(tm5_out[,b],in_tile))
+      }
+              
+      out_tm5_name = paste(out_dir,"/tm5.",year,".tif",sep="")
+      writeRaster(tm5_ras,out_tm5_name,format="GTiff",datatype='FLT4S',NAFlag=fill, overwrite=T)
+      rm(tm5_ras)
+        rm(tm5_out)
+    }  ## end year loop
+
+
+for(b in 1:num_pheno) {
+all_pheno_out[[b]] = array(NA,npix)
+}
+
+ time_process <- system.time  (
+  
+  for(i in seq(1,(nrows/nrows_per_chunk))) {
+    #for(i in 1:100) {
+    in_file = paste(in_dir,"/",in_tile,"_",i,".RData",sep="")
+    if(file.exists(in_file)) {
+      load(in_file)
+    } else {
+      print(paste("File ",in_file,"doesnt exist!"))
+      next
+    }
+    start = ((i-1)*tot_pix_chunk)+1
+    end = i*tot_pix_chunk
+    
+       for(b in 1:num_pheno) {
+            all_pheno_out[[b]][start:end] = pheno_out[,b]
+    }
+    
+    #all_phen_out[]
+    
+  }
+)  ## end system.time
+print(time_process)
+
+
+for(b in 1:num_pheno) {
+  na_ind = is.na(all_pheno_out[[b]])
+  all_pheno_out[[b]][na_ind] = fill
+  pheno_ras = make_ras(all_pheno_out[[b]],in_tile)
+  out_pheno_name = paste(out_dir,"/pheno.m",b,".tif",sep="")
+  writeRaster(pheno_ras,out_pheno_name,format="GTiff",datatype='FLT4S',NAFlag=fill, overwrite=T)
+}
+
+
+
+print("Done with all output!")

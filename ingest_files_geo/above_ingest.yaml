@@ -1,0 +1,58 @@
+# Metadata
+version: 0.1.0
+
+# Database
+# See connection information at:
+# http://docs.sqlalchemy.org/en/latest/core/engines.html#sqlalchemy.engine.url.URL
+database:
+    drivername: sqlite
+    database: $root/tilezilla.db
+    # Not required, but used with postgresql, etc.
+    # username:
+    # password:
+    # host:
+    # port:
+    debug: False
+
+# Tile storage method
+store:
+    ## Required
+    name: GeoTIFF  # could be NetCDF
+    root: /projectnb/modislc/users/dsm/above/test_tile
+    tile_dirpattern: 'Bh{horizontal:02d}v{vertical:02d}'
+    tile_imgpattern: '{product.timeseries_id}_{band.standard_name}.tif'
+    ## Additional option -- specific (?) to GeoTIFF: creation options
+    co:
+        tiled: true
+        blockxsize: 256
+        blockysize: 256
+        compress: deflate
+
+
+# Tile specification
+## For recognized systems
+# tilespec: WELD_CONUS
+## Or manually
+tilespec:
+     # Coordinate reference system - EPSG:102001
+     crs: '+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs'
+     # Upper left x/y coordinate
+     ul: [-3400020, 4640000]
+     # Resolution (x/y) of each pixel
+     res: [30, 30]
+     # Number of pixels (x/y) in each tile
+     size: [6000, 6000]
+
+
+# Products
+products:
+    ## Product handling options, specified by product type
+    ESPALandsat:
+        include_filter:
+            regex: false
+            # Attributes of each product band to include
+            long_name:
+                - '*surface reflectance*'
+                - '*brightness temperature*'
+                - '*cfmask_band*'
+        resampling: nearest
